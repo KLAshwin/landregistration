@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?><!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_1.dtd'><nta><declaration>const int MAX_LANDS = 1000;
+const int MAX_IDS = 1000;
+const int MAX_Secret_IDS = 1000;
+
+typedef int[0,MAX_LANDS-1] LandID;
+typedef int[0,MAX_IDS] NameID;
+typedef int[0,MAX_Secret_IDS] SecretKey;
+
+chan check,accept,reject,open;
+
+typedef struct
+{
+	NameID name;
+	SecretKey key;
+} Signature;
+
+typedef struct
+{
+	LandID landid;
+	NameID CurrentID;
+	Signature CurrentSignature ;
+	NameID PreviousID;
+	Signature PreviousSignature;
+} document;
+
+document database[MAX_LANDS],form;
+bool choose_action;
+
+Signature createSignature(NameID name, SecretKey key)
+{
+	Signature s;
+	s.name = name;
+	s.key = key;
+	return s;
+}
+
+bool check_signature(Signature A, Signature B)
+{
+	if(A.name == B.name and A.key == B.key)
+	return true;
+	return false;
+}
+
+bool verifydoc()
+{
+	int i = form.landid;
+	if(i&gt;=0 and i&lt;MAX_LANDS)
+	{
+		if(database[i].CurrentID == form.PreviousID and check_signature(database[i].CurrentSignature,form.PreviousSignature))
+		{
+			database[i].PreviousID = form.PreviousID;
+			database[i].CurrentID = form.CurrentID;
+			database[i].PreviousSignature = form.PreviousSignature;
+			database[i].CurrentSignature = form.CurrentSignature;
+			return true;
+		}
+	}
+	return false;
+}
+
+void fill_form()
+{
+	form.landid = 3;
+	form.CurrentID = 7;
+	form.CurrentSignature = createSignature(7,7);
+	form.PreviousID = 4;
+	form.PreviousSignature = createSignature(4,4);	
+	choose_action = verifydoc();
+}
+
+void init_database()
+{
+	int i;
+	for(i : LandID)
+	{
+		database[i].landid = i;
+		database[i].CurrentID = i+1;
+		database[i].CurrentSignature = createSignature(i+1,i+1);
+		database[i].PreviousID = 0;
+		database[i].PreviousSignature = createSignature(0,0);
+	}
+}
+</declaration><template><name x="5" y="5">LandInspector</name><declaration>// Place local declarations here.
+</declaration><location id="id0" x="-768" y="-64"><name x="-778" y="-94">start</name></location><location id="id1" x="-600" y="-64"><name x="-624" y="-96">recieve</name></location><location id="id2" x="-424" y="-168"><name x="-456" y="-200">Accepted</name></location><location id="id3" x="-416" y="32"><name x="-440" y="48">Rejected</name></location><location id="id4" x="-248" y="-64"><name x="-232" y="-72">verified</name></location><init ref="id0"/><transition><source ref="id0"/><target ref="id1"/><label kind="synchronisation" x="-712" y="-88">open!</label><label kind="assignment" x="-736" y="-64">init_database()</label></transition><transition><source ref="id1"/><target ref="id4"/><label kind="synchronisation" x="-440" y="-88">check?</label></transition><transition><source ref="id3"/><target ref="id1"/></transition><transition><source ref="id2"/><target ref="id1"/></transition><transition><source ref="id4"/><target ref="id2"/><label kind="guard" x="-352" y="-152">choose_action == true</label><label kind="synchronisation" x="-336" y="-136">accept!</label></transition><transition><source ref="id4"/><target ref="id3"/><label kind="guard" x="-344" y="-8">choose_action == false</label><label kind="synchronisation" x="-320" y="-24">reject!</label></transition></template><template><name>User</name><location id="id5" x="-960" y="-72"><name x="-970" y="-102">start</name></location><location id="id6" x="-440" y="-72"><name x="-450" y="-102">accepted</name></location><location id="id7" x="-720" y="56"><name x="-744" y="72">rejected</name></location><location id="id8" x="-608" y="-72"><name x="-618" y="-102">verified</name></location><location id="id9" x="-824" y="-72"><name x="-840" y="-104">send</name></location><init ref="id5"/><transition><source ref="id5"/><target ref="id9"/><label kind="synchronisation" x="-912" y="-96">open?</label></transition><transition><source ref="id8"/><target ref="id7"/><label kind="synchronisation" x="-664" y="-8">reject?</label></transition><transition><source ref="id8"/><target ref="id6"/><label kind="synchronisation" x="-560" y="-72">accept?</label></transition><transition><source ref="id7"/><target ref="id9"/></transition><transition><source ref="id9"/><target ref="id8"/><label kind="synchronisation" x="-736" y="-96">check!</label><label kind="assignment" x="-744" y="-72">fill_form()</label></transition></template><system>LandInspectorTA = LandInspector();
+UserTA = User();
+system LandInspectorTA,UserTA;</system></nta>
