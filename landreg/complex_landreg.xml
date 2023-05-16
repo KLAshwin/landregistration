@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?><!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_1.dtd'><nta><declaration>const int LAND_NUM = 100; //Maximum lands allowed
+const int TX_NUM = 100; //Maximum transactions allowed
+const int SC_NUM = 100; //Maximum contracts allowed
+const int PARTIES_NUM = 7; //6 Parties + 1 Adversary
+const int INIT_AMNT = 100; //Initial amount provided to all parties
+
+typedef int[0,PARTIES_NUM-1] PartyId;
+typedef int[0,LAND_NUM-1] LANDID;
+typedef int[0,TX_NUM-1] TXID;
+typedef int[0,2] Status;
+
+//Different parties
+const PartyId SELLER1 = 0;
+const PartyId SELLER2 = 1;
+const PartyId SELLER3 = 2;
+const PartyId SELLER4 = 3;
+const PartyId SELLER5 = 4;
+const PartyId BUYER = 5;
+const PartyId ADVERSARY = 6;
+
+typedef struct
+{
+	PartyId Id;
+	int balance;
+	bool own_land[LAND_NUM]; //bool of land owned
+	int secretkey;
+	int publickey;
+} Party;
+
+Party parties[PARTIES_NUM];
+
+typedef struct
+{
+	PartyId Id;
+	int amnt;
+	LANDID landId;
+	int signature;
+} smart_contract;
+
+smart_contract sc[SC_NUM];
+
+//Different states of transaction
+const Status CONFIRMED = 0;
+const Status SPENT = 1;
+const Status CANCELED = 2;
+
+typedef struct
+{
+	PartyId fromId;
+	PartyId toId;
+	int amnt;
+	LANDID landId;
+	Status status;
+	int signature1;
+	int signature2;
+} Tx;
+
+Tx blockchain[TX_NUM];
+TXID bc_curr = 0; //Current pointer to transaction in blockchain
+TXID sc_curr = 0; //Current pointer to transaction in smartcontract
+
+void sell_land(PartyId id, int amount, LANDID landid)
+{
+	smart_contract contract;
+	contract.Id = id;
+	contract.amnt = amount;
+	contract.landId = landid;
+	contract.signature = parties[id].secretkey * parties[id].publickey;
+	sc[sc_curr] = contract;
+	sc_curr++;
+}
+
+void add_trans(PartyId fromid, PartyId toid, int amount, LANDID landid, int Signature1, int Signature2)
+{
+	Tx transaction;
+	transaction.fromId = fromid;
+	transaction.toId = toid;
+	transaction.amnt = amount;
+	transaction.landId = landid;
+	transaction.status = 0;
+	transaction.signature1 = Signature1;
+	transaction.signature2 = Signature2;
+	blockchain[bc_curr] = transaction;
+	bc_curr++;
+}
+
+broadcast chan start,check,request,wait;
+TXID i = 0, j = 0, l = 0;
+LANDID k = 0;
+bool permission = false;</declaration><template><name x="5" y="5">LandInspector</name><declaration>// Place local declarations here.
+int secretkeys[7] = {90,88,22,34,18,6,26};
+int publickeys[7] = {16,8,18,9,4,11,12};
+void initialize()
+{
+	for(i : PartyId)
+	{
+		parties[i].Id = i;
+		parties[i].balance = INIT_AMNT;
+		parties[i].secretkey = secretkeys[i];
+		parties[i].publickey = publickeys[i];
+		for(j : LANDID)
+		{
+			if(i == BUYER or i == ADVERSARY)
+			{
+				parties[i].own_land[j] = false;
+			}
+			if(j%5 == i)
+			{
+				parties[i].own_land[j] = true;
+			}
+		}
+	}
+}</declaration><location id="id0" x="-1000" y="-72"></location><location id="id1" x="-888" y="-72"></location><location id="id2" x="-1120" y="-72"></location><init ref="id2"/><transition><source ref="id0"/><target ref="id1"/><label kind="synchronisation" x="-976" y="-96">request?</label></transition><transition><source ref="id2"/><target ref="id0"/><label kind="synchronisation" x="-1072" y="-96">start!</label><label kind="assignment" x="-1088" y="-72">initialize()</label></transition><transition><source ref="id1"/><target ref="id1"/><label kind="guard" x="-808" y="8">(parties[blockchain[i].fromId].own_land[blockchain[i].landId] != true
+or
+parties[blockchain[i].toId].balance &lt; blockchain[i].amnt
+or
+blockchain[i].signature1 != secretkeys[blockchain[i].fromId] * publickeys[blockchain[i].fromId]
+or
+blockchain[i].signature2 != secretkeys[blockchain[i].toId] * publickeys[blockchain[i].toId])
+and
+i &lt; bc_curr</label><label kind="assignment" x="-808" y="144">blockchain[i].status = 2,
+i = i+1</label><nail x="-968" y="72"/><nail x="-816" y="72"/></transition><transition><source ref="id1"/><target ref="id1"/><label kind="guard" x="-800" y="-320">blockchain[i].status == 0
+and
+parties[blockchain[i].fromId].own_land[blockchain[i].landId] == true
+and
+parties[blockchain[i].toId].balance &gt;= blockchain[i].amnt
+and
+blockchain[i].signature1 == secretkeys[blockchain[i].fromId] * publickeys[blockchain[i].fromId]
+and
+blockchain[i].signature2 == secretkeys[blockchain[i].toId] * publickeys[blockchain[i].toId]
+and
+i &lt; bc_curr</label><label kind="assignment" x="-800" y="-152">parties[blockchain[i].toId].own_land[blockchain[i].landId] = true,
+parties[blockchain[i].fromId].own_land[blockchain[i].landId] = false,
+parties[blockchain[i].toId].balance = parties[blockchain[i].toId].balance - blockchain[i].amnt,
+parties[blockchain[i].fromId].balance = parties[blockchain[i].fromId].balance + blockchain[i].amnt,
+blockchain[i].status = 1,
+i = i+1</label><nail x="-960" y="-240"/><nail x="-816" y="-240"/></transition></template><template><name>Seller1</name><parameter>Party &amp; me</parameter><location id="id3" x="-1952" y="-456"></location><location id="id4" x="-2216" y="-272"></location><location id="id5" x="-1832" y="-272"></location><location id="id6" x="-2064" y="-272"></location><init ref="id4"/><transition><source ref="id3"/><target ref="id6"/><label kind="synchronisation" x="-2032" y="-400">wait?</label></transition><transition><source ref="id5"/><target ref="id3"/><label kind="synchronisation" x="-1888" y="-408">request?</label><label kind="assignment" x="-1888" y="-392">permission = true</label></transition><transition><source ref="id4"/><target ref="id6"/><label kind="synchronisation" x="-2160" y="-296">start?</label></transition><transition><source ref="id6"/><target ref="id5"/><label kind="synchronisation" x="-1984" y="-296">check!</label><label kind="assignment" x="-2024" y="-264">sell_land(SELLER1,15,k),
+k = k+1</label></transition></template><template><name>Buyer</name><parameter>Party &amp; me</parameter><location id="id7" x="-1328" y="-304"></location><location id="id8" x="-1536" y="-304"></location><location id="id9" x="-1008" y="-304"></location><location id="id10" x="-1440" y="-304"></location><init ref="id8"/><transition><source ref="id9"/><target ref="id9"/><label kind="guard" x="-864" y="-184">l &lt; sc_curr
+and
+permission == true
+and
+sc[l].amnt &gt; parties[BUYER].balance</label><label kind="assignment" x="-864" y="-104">l++</label><nail x="-1144" y="-112"/><nail x="-872" y="-112"/></transition><transition><source ref="id9"/><target ref="id9"/><label kind="guard" x="-832" y="-424">l &lt; sc_curr
+and
+permission == true
+and
+sc[l].amnt &lt;= parties[BUYER].balance</label><label kind="assignment" x="-832" y="-344">add_trans(sc[l].Id,BUYER,sc[l].amnt,sc[l].landId,sc[l].signature,parties[BUYER].secretkey * parties[BUYER].publickey),
+l++</label><nail x="-848" y="-456"/><nail x="-840" y="-208"/></transition><transition><source ref="id9"/><target ref="id10"/><label kind="guard" x="-1128" y="-464">permission == false
+or
+l &gt;= sc_curr</label><label kind="synchronisation" x="-1128" y="-480">wait!</label><nail x="-1216" y="-480"/></transition><transition><source ref="id7"/><target ref="id9"/><label kind="synchronisation" x="-1224" y="-328">request!</label></transition><transition><source ref="id10"/><target ref="id7"/><label kind="synchronisation" x="-1400" y="-328">check?</label></transition><transition><source ref="id8"/><target ref="id10"/><label kind="synchronisation" x="-1504" y="-328">start?</label></transition></template><template><name>Adversary</name><parameter>Party &amp; me</parameter><declaration>void try_to_send(PartyId id, Tx transaction)
+{
+	add_trans(transaction.fromId,id,transaction.amnt,transaction.landId,transaction.signature1,transaction.signature2);
+	add_trans(id,transaction.toId,transaction.amnt,transaction.landId,transaction.signature1,transaction.signature2);
+}</declaration><location id="id11" x="-192" y="-64"></location><location id="id12" x="-344" y="-64"></location><location id="id13" x="-512" y="-64"></location><location id="id14" x="-56" y="-64"></location><init ref="id13"/><transition><source ref="id11"/><target ref="id14"/><label kind="synchronisation" x="-152" y="-88">wait?</label></transition><transition><source ref="id12"/><target ref="id11"/><label kind="synchronisation" x="-296" y="-88">request?</label></transition><transition><source ref="id14"/><target ref="id14"/><label kind="guard" x="128" y="-232">j &lt; bc_curr
+and
+(blockchain[j].fromId == ADVERSARY
+or
+blockchain[j].toId == ADVERSARY)</label><label kind="assignment" x="128" y="-152">j++</label><nail x="48" y="-216"/><nail x="168" y="-64"/></transition><transition><source ref="id14"/><target ref="id14"/><label kind="guard" x="56" y="-8">j &lt; bc_curr
+and
+blockchain[j].fromId != ADVERSARY
+and
+blockchain[j].toId != ADVERSARY</label><label kind="assignment" x="56" y="72">try_to_send(ADVERSARY,blockchain[j]),
+j++</label><nail x="-144" y="80"/><nail x="56" y="80"/></transition><transition><source ref="id14"/><target ref="id12"/><label kind="guard" x="-160" y="-216">j &gt;= bc_curr</label><nail x="-192" y="-216"/></transition><transition><source ref="id13"/><target ref="id12"/><label kind="synchronisation" x="-440" y="-88">start?</label></transition></template><template><name>Seller2</name><parameter>Party &amp; me</parameter><location id="id15" x="56" y="-200"></location><location id="id16" x="168" y="-16"></location><location id="id17" x="-56" y="-16"></location><location id="id18" x="-264" y="-16"></location><init ref="id18"/><transition><source ref="id15"/><target ref="id17"/><label kind="synchronisation" x="-32" y="-136">wait?</label></transition><transition><source ref="id16"/><target ref="id15"/><label kind="synchronisation" x="120" y="-144">request?</label><label kind="assignment" x="120" y="-128">permission = true</label></transition><transition><source ref="id17"/><target ref="id16"/><label kind="synchronisation" x="24" y="-40">check?</label><label kind="assignment" x="-16" y="-16">sell_land(SELLER2,15,k),
+k = k+1</label></transition><transition><source ref="id18"/><target ref="id17"/><label kind="synchronisation" x="-184" y="-40">start?</label></transition></template><template><name>Seller3</name><parameter>Party &amp; me</parameter><location id="id19" x="72" y="-176"></location><location id="id20" x="192" y="-8"></location><location id="id21" x="-24" y="-8"></location><location id="id22" x="-224" y="-8"></location><init ref="id22"/><transition><source ref="id19"/><target ref="id21"/><label kind="synchronisation" x="-36" y="-107">wait?</label></transition><transition><source ref="id20"/><target ref="id19"/><label kind="synchronisation" x="144" y="-120">request?</label><label kind="assignment" x="144" y="-104">permission = true</label></transition><transition><source ref="id21"/><target ref="id20"/><label kind="synchronisation" x="48" y="-32">check?</label><label kind="assignment" x="8" y="-8">sell_land(SELLER3,15,k),
+k = k+1</label></transition><transition><source ref="id22"/><target ref="id21"/><label kind="synchronisation" x="-152" y="-32">start?</label></transition></template><template><name>Seller4</name><parameter>Party &amp; me</parameter><location id="id23" x="72" y="-192"></location><location id="id24" x="192" y="-24"></location><location id="id25" x="-24" y="-24"></location><location id="id26" x="-224" y="-24"></location><init ref="id26"/><transition><source ref="id23"/><target ref="id25"/><label kind="synchronisation" x="-24" y="-128">wait?</label></transition><transition><source ref="id24"/><target ref="id23"/><label kind="synchronisation" x="144" y="-144">request?</label><label kind="assignment" x="144" y="-128">permission = true</label></transition><transition><source ref="id25"/><target ref="id24"/><label kind="synchronisation" x="48" y="-48">check?</label><label kind="assignment" x="16" y="-24">sell_land(SELLER4,15,k),
+k = k+1</label></transition><transition><source ref="id26"/><target ref="id25"/><label kind="synchronisation" x="-144" y="-48">start?</label></transition></template><template><name>Seller5</name><parameter>Party &amp; me</parameter><location id="id27" x="72" y="-184"></location><location id="id28" x="200" y="-8"></location><location id="id29" x="-40" y="-8"></location><location id="id30" x="-232" y="-8"></location><init ref="id30"/><transition><source ref="id27"/><target ref="id29"/><label kind="synchronisation" x="-44" y="-111">wait?</label></transition><transition><source ref="id28"/><target ref="id27"/><label kind="synchronisation" x="144" y="-120">request?</label><label kind="assignment" x="144" y="-104">permission = true</label></transition><transition><source ref="id29"/><target ref="id28"/><label kind="synchronisation" x="40" y="-32">check?</label><label kind="assignment" x="8" y="-8">sell_land(SELLER5,15,k),
+k = k+1</label></transition><transition><source ref="id30"/><target ref="id29"/><label kind="synchronisation" x="-160" y="-32">start?</label></transition></template><system>LandInspectorTA = LandInspector();
+SellerTA1 = Seller1(parties[SELLER1]);
+SellerTA2 = Seller2(parties[SELLER1]);
+SellerTA3 = Seller3(parties[SELLER1]);
+SellerTA4 = Seller4(parties[SELLER1]);
+SellerTA5 = Seller5(parties[SELLER1]);
+BuyerTA = Buyer(parties[BUYER]);
+AdversaryTA = Adversary(parties[ADVERSARY]);
+
+system LandInspectorTA,SellerTA1,SellerTA2,SellerTA3,SellerTA4,SellerTA5,BuyerTA,AdversaryTA;</system></nta>
